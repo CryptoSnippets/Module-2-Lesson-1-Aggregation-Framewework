@@ -2,6 +2,8 @@ require 'mongo'
 require 'json'
 require 'pp'
 require 'byebug'
+require 'irbtools/binding'
+
 Mongo::Logger.logger.level = ::Logger::INFO
 #Mongo::Logger.logger.level = ::Logger::DEBUG
 
@@ -56,14 +58,39 @@ class Solution
   #
 
   def racer_names
+    @coll.find.aggregate([ {
+      :$project=>{
+          :_id=>0, 
+          :first_name=>1,
+          :last_name=>1
+      }
+    }
+    ])
     #place solution here
   end
 
   def id_number_map 
+    @coll.find.aggregate([ {
+      :$project=>{
+          :_id=>1, 
+          :number=>1
+      }
+    }
+    ])
     #place solution here
   end
 
   def concat_names
+    @coll.find.aggregate([ {
+      :$project => {
+        :_id=>0, 
+        :number=>1, 
+        :name => {
+          :$concat => ["$last_name", ", ", "$first_name"]
+          }
+      }
+    }
+    ])
     #place solution here
   end
 
@@ -73,14 +100,45 @@ class Solution
   #
 
   def group_times
+    @coll.find.aggregate([ {
+      :$group=>{
+        :_id=>{
+          :gender=>"$gender",
+          :age=>"$group" 
+        }, 
+        runners:{:$sum=>1}, 
+        fastest_time:{:$min=>"$secs"}
+      }
+    }
+    ])
     #place solution here
   end
 
   def group_last_names
+    @coll.find.aggregate([ {
+      :$group=>{
+        :_id=>{
+          :gender=>"$gender",
+          :age=>"$group" 
+        }, 
+        last_names:{:$push=>"$last_name"}
+      }
+    }
+    ])
     #place solution here
   end
 
   def group_last_names_set
+    @coll.find.aggregate([ {
+      :$group=>{
+        :_id=>{
+          :gender=>"$gender",
+          :age=>"$group" 
+        }, 
+        last_names:{:$addToSet=>"$last_name"}
+      }
+    }
+    ])
     #place solution here
   end
 
@@ -88,10 +146,50 @@ class Solution
   # Lecture 4: $match
   #
   def groups_faster_than criteria_time
+    @coll.find.aggregate([ {
+      :$group=>{
+        :_id=>{
+          :gender=>"$gender",
+          :age=>"$group" 
+        }, 
+        runners:{:$sum=>1}, 
+        fastest_time:{:$min=>"$secs"}
+      }
+    },
+    {
+      :$match=>{
+        :fastest_time=>{
+          :$lte=>criteria_time
+        }
+      }
+    }
+    ])
     #place solution here
   end
 
   def age_groups_faster_than age_group, criteria_time
+    @coll.find.aggregate([ {
+      :$match=>{
+        :group=>age_group
+      }
+      },
+      {
+      :$group=>{
+        :_id=>{
+          :gender=>"$gender",
+          :age=>"$group" 
+        }, 
+        runners:{:$sum=>1}, 
+        fastest_time:{:$min=>"$secs"}
+      }
+    },
+    {
+      :$match=>{
+        :fastest_time=>{
+          :$lte=>criteria_time
+        }
+      }
+    } ])
     #place solution here
   end
 
@@ -100,10 +198,53 @@ class Solution
   # Lecture 5: $unwind
   #
   def avg_family_time last_name
+    @coll.find.aggregate([ {
+      :$match=>{
+        :last_name=>last_name
+      }
+    }, 
+    {
+      :$group=>{
+        :_id=>"$last_name", 
+        avg_time:{
+          :$avg=>"$secs"
+        }, 
+        numbers:{
+          :$push=>"$number"
+        }
+      }
+    }])
     #place solution here
   end
   
   def number_goal last_name
+    @coll.find.aggregate([ {
+      :$match=>{
+        :last_name=>last_name
+      }
+    }, 
+    {
+      :$group=>{
+        :_id=>"$last_name", 
+        avg_time:{
+          :$avg=>"$secs"
+        }, 
+        numbers:{
+          :$push=>"$number"
+        }
+      }
+    },
+     {
+      :$unwind=>"$numbers"
+      },
+     {
+      :$project=>{
+        _id:0, 
+        :number=>"$numbers", 
+        avg_time:1, 
+        last_name:"$_id"
+        }
+    } ])
     #place solution here
   end
 
